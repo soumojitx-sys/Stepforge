@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="StepForge" />
+  <meta name="theme-color" content="#080c10" />
+  <title>StepForge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #080c10;
+      --surface:  #0f1620;
+      --card:     #131c28;
+      --border:   #1e2d3d;
+      --lime:     #b8ff1a;
+      --lime-dim: #7aaa0e;
+      --cyan:     #00d4ff;
+      --text:     #e8f0f8;
+      --muted:    #526070;
+      --danger:   #ff4d6a;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    /* ── BACKGROUND GRID ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(184,255,26,.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(184,255,26,.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    #app {
+      position: relative; z-index: 1;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding: 0 0 env(safe-area-inset-bottom, 0);
+    }
+
+    /* ── HEADER ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 22px 10px;
+    }
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      letter-spacing: 2px;
+      color: var(--lime);
+    }
+    .logo span { color: var(--text); }
+
+    #settings-btn {
+      width: 40px; height: 40px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    #settings-btn:active { background: var(--border); }
+    #settings-btn svg { width: 18px; height: 18px; stroke: var(--muted); }
+
+    /* ── STATUS PILL ── */
+    .status-pill {
+      display: flex; align-items: center; gap: 8px;
+      margin: 0 22px 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 7px 16px;
+      width: fit-content;
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background .3s;
+      flex-shrink: 0;
+    }
+    .status-dot.active { background: var(--lime); box-shadow: 0 0 8px var(--lime); animation: pulse 1.4s ease infinite; }
+    .status-dot.paused { background: #f59e0b; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+    .status-text { font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: .5px; }
+
+    /* ── MAIN COUNTER ── */
+    .counter-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      position: relative;
+    }
+
+    .step-ring {
+      position: relative;
+      width: 220px; height: 220px;
+    }
+    .step-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .ring-bg { fill: none; stroke: var(--border); stroke-width: 6; }
+    .ring-progress {
+      fill: none;
+      stroke: var(--lime);
+      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-dasharray: 628;
+      stroke-dashoffset: 628;
+      transition: stroke-dashoffset .6s cubic-bezier(.4,0,.2,1);
+      filter: drop-shadow(0 0 6px var(--lime));
+    }
+    .ring-center {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    #step-count {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 72px;
+      line-height: 1;
+      color: var(--text);
+      letter-spacing: 2px;
+      transition: transform .1s;
+    }
+    #step-count.bump { transform: scale(1.08); }
+    .step-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    /* ── STAT CARDS ── */
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      padding: 0 18px;
+      margin-top: 16px;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .stat-icon { font-size: 18px; line-height: 1; }
+    .stat-val {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 24px;
+      letter-spacing: 1px;
+      color: var(--text);
+      line-height: 1.1;
+    }
+    .stat-lbl {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .stat-card.highlight { border-color: rgba(184,255,26,.25); background: rgba(184,255,26,.04); }
+    .stat-card.highlight .stat-val { color: var(--lime); }
+
+    /* ── GOAL BAR ── */
+    .goal-section {
+      padding: 14px 18px 6px;
+    }
+    .goal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .goal-title { font-size: 11px; font-weight: 600; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
+    .goal-pct { font-size: 12px; font-weight: 600; color: var(--lime); }
+    .goal-bar-bg {
+      height: 6px; background: var(--border); border-radius: 99px; overflow: hidden;
+    }
+    .goal-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--lime-dim), var(--lime));
+      border-radius: 99px;
+      transition: width .6s cubic-bezier(.4,0,.2,1);
+      width: 0%;
+    }
+
+    /* ── CONTROLS ── */
+    .controls {
+      padding: 16px 18px 20px;
+      display: flex;
+      gap: 12px;
+    }
+    .btn-reset {
+      width: 52px; height: 52px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background .2s;
+    }
+    .btn-reset:active { background: var(--border); }
+    .btn-reset svg { width: 20px; height: 20px; stroke: var(--muted); }
+
+    #main-btn {
+      flex: 1; height: 52px;
+      border: none;
+      border-radius: 14px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 20px;
+      letter-spacing: 3px;
+      cursor: pointer;
+      transition: all .2s;
+      position: relative;
+      overflow: hidden;
+    }
+    #main-btn.start {
+      background: var(--lime);
+      color: var(--bg);
+      box-shadow: 0 0 24px rgba(184,255,26,.35);
+    }
+    #main-btn.stop {
+      background: var(--surface);
+      color: var(--danger);
+      border: 1px solid rgba(255,77,106,.3);
+      box-shadow: 0 0 16px rgba(255,77,106,.15);
+    }
+    #main-btn:active { transform: scale(.97); }
+    #main-btn::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: rgba(255,255,255,.15);
+      opacity: 0;
+      transition: opacity .15s;
+    }
+    #main-btn:active::after { opacity: 1; }
+
+    /* ── SETTINGS PANEL ── */
+    .panel-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,.7);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: flex-end;
+    }
+    .panel-overlay.open { display: flex; }
+
+    .panel {
+      width: 100%;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-radius: 20px 20px 0 0;
+      padding: 16px 22px 40px;
+      animation: slideUp .3s cubic-bezier(.4,0,.2,1);
+    }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+    .panel-handle {
+      width: 40px; height: 4px;
+      background: var(--border);
+      border-radius: 99px;
+      margin: 0 auto 20px;
+    }
+    .panel-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px; letter-spacing: 2px;
+      margin-bottom: 20px;
+      color: var(--lime);
+    }
+
+    .field { margin-bottom: 16px; }
+    .field label {
+      display: block;
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 2px; text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .field input, .field select {
+      width: 100%;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      color: var(--text);
+      outline: none;
+      transition: border-color .2s;
+      -webkit-appearance: none;
+    }
+    .field input:focus, .field select:focus { border-color: var(--lime); }
+    .field select option { background: var(--surface); }
+
+    .sens-row {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .sens-row input[type=range] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 4px;
+      background: var(--border);
+      border-radius: 99px;
+      border: none;
+      padding: 0;
+    }
+    .sens-row input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: var(--lime);
+      cursor: pointer;
+    }
+    .sens-val {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px; color: var(--lime);
+      min-width: 28px; text-align: right;
+    }
+
+    .btn-save {
+      width: 100%; padding: 14px;
+      background: var(--lime); color: var(--bg);
+      border: none; border-radius: 12px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px; letter-spacing: 3px;
+      cursor: pointer; margin-top: 8px;
+      transition: opacity .2s;
+    }
+    .btn-save:active { opacity: .85; }
+
+    /* ── PERMISSION SCREEN ── */
+    #perm-screen {
+      position: fixed; inset: 0; z-index: 200;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 32px;
+      text-align: center;
+      gap: 16px;
+    }
+    #perm-screen .big-icon { font-size: 64px; line-height: 1; }
+    #perm-screen h2 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 32px; letter-spacing: 2px;
+      color: var(--lime);
+    }
+    #perm-screen p { font-size: 14px; color: var(--muted); line-height: 1.6; max-width: 280px; }
+    #perm-btn {
+      margin-top: 8px;
+      padding: 16px 40px;
+      background: var(--lime); color: var(--bg);
+      border: none; border-radius: 14px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 20px; letter-spacing: 3px;
+      cursor: pointer;
+    }
+    #perm-screen.hidden { display: none; }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: var(--card); border: 1px solid var(--border);
+      color: var(--text); font-size: 13px; font-weight: 500;
+      padding: 10px 20px; border-radius: 99px;
+      opacity: 0; transition: all .3s;
+      pointer-events: none; z-index: 999;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<!-- Permission Screen (iOS) -->
+<div id="perm-screen">
+  <div class="big-icon">🏃</div>
+  <h2>StepForge</h2>
+  <p>To count your steps, StepForge needs access to your phone's motion sensor. Your data never leaves your device.</p>
+  <button id="perm-btn">Allow Motion Access</button>
+</div>
+
+<div id="app">
+  <header>
+    <div class="logo">Step<span>Forge</span></div>
+    <div id="settings-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </div>
+  </header>
+
+  <div class="status-pill">
+    <div class="status-dot" id="status-dot"></div>
+    <span class="status-text" id="status-text">READY TO TRACK</span>
+  </div>
+
+  <div class="counter-wrap">
+    <div class="step-ring">
+      <svg viewBox="0 0 220 220">
+        <circle class="ring-bg" cx="110" cy="110" r="100"/>
+        <circle class="ring-progress" id="ring-prog" cx="110" cy="110" r="100"/>
+      </svg>
+      <div class="ring-center">
+        <div id="step-count">0</div>
+        <div class="step-label">Steps</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-icon">⏱</div>
+      <div class="stat-val" id="stat-time">00:00</div>
+      <div class="stat-lbl">Time</div>
+    </div>
+    <div class="stat-card highlight">
+      <div class="stat-icon">🔥</div>
+      <div class="stat-val" id="stat-cal">0</div>
+      <div class="stat-lbl">Kcal</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">📍</div>
+      <div class="stat-val" id="stat-km">0.00</div>
+      <div class="stat-lbl">Km</div>
+    </div>
+  </div>
+
+  <div class="goal-section">
+    <div class="goal-header">
+      <span class="goal-title">Daily Goal</span>
+      <span class="goal-pct" id="goal-pct">0%</span>
+    </div>
+    <div class="goal-bar-bg">
+      <div class="goal-bar-fill" id="goal-bar"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="btn-reset" id="reset-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+        <path d="M3 3v5h5"/>
+      </svg>
+    </div>
+    <button id="main-btn" class="start">START TRACKING</button>
+  </div>
+</div>
+
+<!-- Settings Panel -->
+<div class="panel-overlay" id="panel-overlay">
+  <div class="panel">
+    <div class="panel-handle"></div>
+    <div class="panel-title">Settings</div>
+
+    <div class="field">
+      <label>Your Weight</label>
+      <input type="number" id="inp-weight" placeholder="70" min="30" max="250" inputmode="decimal" />
+    </div>
+    <div class="field">
+      <label>Unit</label>
+      <select id="inp-unit">
+        <option value="kg">Kilograms (kg)</option>
+        <option value="lbs">Pounds (lbs)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Daily Step Goal</label>
+      <input type="number" id="inp-goal" placeholder="8000" min="1000" max="50000" inputmode="numeric" />
+    </div>
+    <div class="field">
+      <label>Step Sensitivity <span style="font-size:10px">(lower = more sensitive)</span></label>
+      <div class="sens-row">
+        <input type="range" id="inp-sens" min="1" max="10" value="5" />
+        <div class="sens-val" id="sens-disp">5</div>
+      </div>
+    </div>
+    <button class="btn-save" id="save-btn">SAVE SETTINGS</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── STATE ──────────────────────────────────────────────────────────────
+  let isRunning = false;
+  let steps = 0;
+  let startTime = null;
+  let elapsed = 0;
+  let timerInterval = null;
+  let motionListener = null;
+
+  // User settings (persisted in localStorage)
+  let settings = {
+    weight: 70,
+    unit: 'kg',
+    goal: 8000,
+    sensitivity: 5
+  };
+
+  // Step detection state
+  let lastMag = 0;
+  let peakMag = 0;
+  let rising = false;
+  let lastStepMs = 0;
+  const MIN_STEP_MS = 280;
+
+  // ── CONSTANTS ──────────────────────────────────────────────────────────
+  const STRIDE_M = 0.762; // avg stride ~76.2cm
+
+  // ── LOAD SETTINGS ──────────────────────────────────────────────────────
+  function loadSettings() {
+    try {
+      const s = localStorage.getItem('sf_settings');
+      if (s) settings = { ...settings, ...JSON.parse(s) };
+    } catch(e) {}
+    applySettingsToUI();
+  }
+
+  function saveSettings() {
+    settings.weight = parseFloat(document.getElementById('inp-weight').value) || 70;
+    settings.unit   = document.getElementById('inp-unit').value;
+    settings.goal   = parseInt(document.getElementById('inp-goal').value) || 8000;
+    settings.sensitivity = parseInt(document.getElementById('inp-sens').value);
+    try { localStorage.setItem('sf_settings', JSON.stringify(settings)); } catch(e) {}
+    closePanel();
+    showToast('Settings saved ✓');
+    updateDisplay();
+  }
+
+  function applySettingsToUI() {
+    document.getElementById('inp-weight').value = settings.weight;
+    document.getElementById('inp-unit').value   = settings.unit;
+    document.getElementById('inp-goal').value   = settings.goal;
+    document.getElementById('inp-sens').value   = settings.sensitivity;
+    document.getElementById('sens-disp').textContent = settings.sensitivity;
+  }
+
+  // ── THRESHOLD ──────────────────────────────────────────────────────────
+  function getThreshold() {
+    // sensitivity 1 (most sensitive) → threshold 8; 10 (least) → threshold 16
+    return 8 + (settings.sensitivity - 1) * 0.9;
+  }
+
+  // ── STEP DETECTION ─────────────────────────────────────────────────────
+  function processMotion(e) {
+    const acc = e.accelerationIncludingGravity || e.acceleration;
+    if (!acc) return;
+    const x = acc.x || 0, y = acc.y || 0, z = acc.z || 0;
+    const mag = Math.sqrt(x*x + y*y + z*z);
+
+    if (mag > lastMag) {
+      if (!rising) rising = true;
+      if (mag > peakMag) peakMag = mag;
+    } else {
+      if (rising && peakMag > getThreshold()) {
+        const now = Date.now();
+        if (now - lastStepMs > MIN_STEP_MS) {
+          countStep();
+          lastStepMs = now;
+        }
+      }
+      rising = false;
+      peakMag = 0;
+    }
+    lastMag = mag;
+  }
+
+  function countStep() {
+    steps++;
+    updateDisplay();
+    // bump animation
+    const el = document.getElementById('step-count');
+    el.classList.remove('bump');
+    requestAnimationFrame(() => el.classList.add('bump'));
+    setTimeout(() => el.classList.remove('bump'), 150);
+  }
+
+  // ── CALORIE CALCULATION ────────────────────────────────────────────────
+  function calcCalories() {
+    let kg = settings.weight;
+    if (settings.unit === 'lbs') kg = kg * 0.453592;
+    // ~0.00057 kcal per step per kg (metabolic equivalent method)
+    return Math.round(steps * kg * 0.00057);
+  }
+
+  // ── DISTANCE ──────────────────────────────────────────────────────────
+  function calcKm() {
+    return ((steps * STRIDE_M) / 1000).toFixed(2);
+  }
+
+  // ── TIMER ─────────────────────────────────────────────────────────────
+  function formatTime(ms) {
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const h = Math.floor(m / 60);
+    if (h > 0) return `${h}:${String(m % 60).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
+    return `${String(m).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
+  }
+
+  // ── DISPLAY ────────────────────────────────────────────────────────────
+  function updateDisplay() {
+    document.getElementById('step-count').textContent = steps.toLocaleString();
+    document.getElementById('stat-cal').textContent   = calcCalories();
+    document.getElementById('stat-km').textContent    = calcKm();
+
+    // Goal ring
+    const pct = Math.min(steps / settings.goal, 1);
+    const circ = 2 * Math.PI * 100; // 628
+    document.getElementById('ring-prog').style.strokeDashoffset = circ * (1 - pct);
+
+    // Goal bar
+    const barPct = Math.min(pct * 100, 100);
+    document.getElementById('goal-bar').style.width = barPct + '%';
+    document.getElementById('goal-pct').textContent = Math.round(barPct) + '%';
+
+    // Celebration at goal
+    if (steps === settings.goal) showToast('🎉 Daily goal reached!');
+  }
+
+  function updateTimer() {
+    const now = Date.now();
+    elapsed = now - startTime;
+    document.getElementById('stat-time').textContent = formatTime(elapsed);
+  }
+
+  // ── START / STOP ───────────────────────────────────────────────────────
+  function startTracking() {
+    isRunning = true;
+    startTime = Date.now() - elapsed;
+    timerInterval = setInterval(updateTimer, 1000);
+
+    // Reset peak detection
+    lastMag = 0; peakMag = 0; rising = false; lastStepMs = 0;
+
+    motionListener = processMotion;
+    window.addEventListener('devicemotion', motionListener, { passive: true });
+
+    document.getElementById('main-btn').textContent = 'STOP TRACKING';
+    document.getElementById('main-btn').className = 'stop';
+    document.getElementById('status-dot').className = 'status-dot active';
+    document.getElementById('status-text').textContent = 'TRACKING ACTIVE';
+  }
+
+  function stopTracking() {
+    isRunning = false;
+    clearInterval(timerInterval);
+    if (motionListener) window.removeEventListener('devicemotion', motionListener);
+
+    document.getElementById('main-btn').textContent = 'RESUME TRACKING';
+    document.getElementById('main-btn').className = 'start';
+    document.getElementById('status-dot').className = 'status-dot paused';
+    document.getElementById('status-text').textContent = 'PAUSED — TAP TO RESUME';
+  }
+
+  function resetAll() {
+    if (isRunning) stopTracking();
+    steps = 0; elapsed = 0;
+    document.getElementById('stat-time').textContent = '00:00';
+    document.getElementById('main-btn').textContent = 'START TRACKING';
+    document.getElementById('main-btn').className = 'start';
+    document.getElementById('status-dot').className = 'status-dot';
+    document.getElementById('status-text').textContent = 'READY TO TRACK';
+    updateDisplay();
+  }
+
+  // ── PANEL ──────────────────────────────────────────────────────────────
+  function openPanel()  { document.getElementById('panel-overlay').classList.add('open'); }
+  function closePanel() { document.getElementById('panel-overlay').classList.remove('open'); }
+
+  // ── TOAST ──────────────────────────────────────────────────────────────
+  let toastTimer;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+
+  // ── PERMISSION HANDLING ────────────────────────────────────────────────
+  function setupPermission() {
+    const screen = document.getElementById('perm-screen');
+
+    // Check if DeviceMotionEvent exists
+    if (typeof DeviceMotionEvent === 'undefined') {
+      screen.querySelector('p').textContent = '⚠️ Motion sensor not available on this device/browser. Try opening this in Chrome or Safari on your phone.';
+      document.getElementById('perm-btn').textContent = 'GOT IT';
+      document.getElementById('perm-btn').onclick = () => screen.classList.add('hidden');
+      return;
+    }
+
+    // iOS 13+ requires explicit permission
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      document.getElementById('perm-btn').onclick = async () => {
+        try {
+          const res = await DeviceMotionEvent.requestPermission();
+          if (res === 'granted') {
+            screen.classList.add('hidden');
+            showToast('Motion access granted ✓');
+          } else {
+            screen.querySelector('p').textContent = '❌ Permission denied. Please allow motion access in Settings → Safari → Motion & Orientation Access, then reload.';
+          }
+        } catch(e) {
+          screen.classList.add('hidden');
+        }
+      };
+    } else {
+      // Android / non-iOS — no permission needed
+      screen.classList.add('hidden');
+    }
+  }
+
+  // ── EVENT LISTENERS ────────────────────────────────────────────────────
+  document.getElementById('main-btn').addEventListener('click', () => {
+    isRunning ? stopTracking() : startTracking();
+  });
+
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    if (steps === 0 && elapsed === 0) return;
+    resetAll();
+    showToast('Session reset');
+  });
+
+  document.getElementById('settings-btn').addEventListener('click', openPanel);
+  document.getElementById('panel-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('panel-overlay')) closePanel();
+  });
+  document.getElementById('save-btn').addEventListener('click', saveSettings);
+
+  document.getElementById('inp-sens').addEventListener('input', function() {
+    document.getElementById('sens-disp').textContent = this.value;
+  });
+
+  // ── INIT ───────────────────────────────────────────────────────────────
+  loadSettings();
+  setupPermission();
+  updateDisplay();
+</script>
+</body>
+</html>
